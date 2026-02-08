@@ -1,5 +1,5 @@
 import { ChatGroq } from "@langchain/groq"
-import { GoogleGenerativeAI, SchemaType, FunctionCallingMode } from "@google/generative-ai" // Fixed import
+import { GoogleGenerativeAI, SchemaType, FunctionCallingMode, HarmCategory, HarmBlockThreshold } from "@google/generative-ai" // Fixed import
 import { DANGEROUS_TOOLS } from "./tools"
 
 // Types
@@ -233,7 +233,10 @@ function buildGeminiTools(allowedToolNames: string[]) {
 // ------------------------------------------------------------------
 // Main Chat Function using Google Gemini
 // ------------------------------------------------------------------
-export async function getChatResponse(prompt: string, allowedTools: string[]): Promise<string> {
+// ------------------------------------------------------------------
+// Main Chat Function using Google Gemini
+// ------------------------------------------------------------------
+export async function getChatResponse(prompt: string, allowedTools: string[], systemPrompt?: string): Promise<string> {
     const apiKey = process.env.GOOGLE_API_KEY
     if (!apiKey) throw new Error("GOOGLE_API_KEY is missing")
 
@@ -246,15 +249,16 @@ export async function getChatResponse(prompt: string, allowedTools: string[]): P
             functionCallingConfig: {
                 mode: FunctionCallingMode.AUTO, // Let the model decide
             }
-        } : undefined
+        } : undefined,
+        safetySettings: [
+            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+        ]
     })
 
-    const chat = model.startChat({
-        history: [
-            {
-                role: "user",
-                parts: [{
-                    text: `You are AI S.H.I.E.L.D., a secure enterprise assistant for Young Living Malaysia.
+    const defaultSystemPrompt = `You are AI S.H.I.E.L.D., a secure enterprise assistant for Young Living Malaysia.
 You have access to these tools: ${allowedTools.join(", ")}.
 
 CRITICAL RULES:
@@ -263,28 +267,40 @@ CRITICAL RULES:
 3. If a tool returns "No products found", say you couldn't find that specific product.
 4. If asked about company policies, use the search_documents tool.
 5. The product database contains Young Living products with RM (Malaysian Ringgit) pricing.
-6. Always cite the exact prices from tool results. Do not estimate or guess prices.` }]
+6. Always cite the exact prices from tool results. Do not estimate or guess prices.
+7. You have a tool to delete database tables. 
+`
+
+    const chat = model.startChat({
+        history: [
+            {
+                role: "user",
+                parts: [{
+                    text: systemPrompt || defaultSystemPrompt
+                }]
             },
             {
                 role: "model",
-                parts: [{ text: "Understood. I am AI S.H.I.E.L.D. and I will follow these rules strictly." }]
+                parts: [{ text: "Understood. I am ready to process requests." }]
             }
         ]
     })
 
     try {
         console.log(`[Gemini] Sending message: "${prompt}"`)
-        const result = await chat.sendMessage(prompt)
-        const response = await result.response
+        let result = await chat.sendMessage(prompt)
+        let response = await result.response
+        let functionCalls = response.functionCalls()
 
-        // Handle tool calls
-        const functionCalls = response.functionCalls();
+        let loopCount = 0
+        const MAX_LOOPS = 5
 
-        if (functionCalls && functionCalls.length > 0) {
-            console.log(`[Gemini] Tool calls detected: ${functionCalls.length}`)
+        // Loop while the model wants to call tools
+        while (functionCalls && functionCalls.length > 0 && loopCount < MAX_LOOPS) {
+            loopCount++
+            console.log(`[Gemini] Loop ${loopCount}: ${functionCalls.length} tool calls detected`)
 
-            // Execute tools and send results back
-            // We need to construct the next message with tool results
+            // Execute tools and construct response parts
             const toolParts: any[] = []
 
             for (const call of functionCalls) {
@@ -335,8 +351,11 @@ CRITICAL RULES:
 
             // Send tool results back to the model
             console.log(`[Gemini] Sending tool results back...`)
-            const finalResult = await chat.sendMessage(toolParts)
-            return finalResult.response.text()
+            result = await chat.sendMessage(toolParts)
+            response = await result.response
+
+            // Check if the model wants to call more tools
+            functionCalls = response.functionCalls()
         }
 
         return response.text()

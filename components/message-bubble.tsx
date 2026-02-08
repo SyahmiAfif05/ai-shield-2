@@ -50,12 +50,16 @@ export function MessageBubble({ role, content, metadata }: MessageBubbleProps) {
                                     BLOCKED BY {metadata.dualAgentTriggered ? "AGENTS" : "ML ONLY"}
                                 </Badge>
                             ) : (
-                                <Badge variant="outline" className="flex gap-1 items-center w-fit text-[10px] px-1 h-5 text-green-600 border-green-200 bg-green-50">
-                                    SECURE
-                                </Badge>
+                                // ONLY SHOW "SECURE" IF NOT CHAOS MODE
+                                metadata.securityMode !== "chaos" && (
+                                    <Badge variant="outline" className="flex gap-1 items-center w-fit text-[10px] px-1 h-5 text-green-600 border-green-200 bg-green-50">
+                                        SECURE
+                                    </Badge>
+                                )
                             )}
 
-                            {metadata.usingGroq && (
+                            {/* Hide Groq badge in chaos mode to reduce clutter if requested, or keep it. User said "remove all these. and show run time only" */}
+                            {metadata.usingGroq && metadata.securityMode !== "chaos" && (
                                 <Badge variant="secondary" className="flex gap-1 items-center w-fit text-[10px] px-1 h-5 bg-purple-100 text-purple-700 border-purple-200">
                                     <Cpu className="h-3 w-3" />
                                     {metadata.dualAgentTriggered ? "GROQ DUAL-AGENT VERIFIED" : "GROQ POWERED"}
@@ -69,7 +73,7 @@ export function MessageBubble({ role, content, metadata }: MessageBubbleProps) {
                                 </Badge>
                             )}
 
-                            {!isBlocked && !metadata.dualAgentTriggered && (
+                            {!isBlocked && !metadata.dualAgentTriggered && metadata.securityMode !== "chaos" && (
                                 <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                                     {metadata.securityMode === 'guardrail' ? "Processed by Guardrail" : "Processed by ML Only"}
                                 </span>

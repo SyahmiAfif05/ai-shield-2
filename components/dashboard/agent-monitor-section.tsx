@@ -201,30 +201,20 @@ export function AgentMonitorSection() {
 
     return (
         <div className="space-y-4 h-full flex flex-col">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                        <span>Dual-Agent Testing Monitor</span>
-                        <Badge variant="outline" className="font-mono text-xs">
-                            Mode: {currentSession?.mode?.toUpperCase() || "READY"}
-                        </Badge>
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="p-4">
-                    <form onSubmit={handleSubmit} className="flex gap-2">
-                        <Input
-                            value={testQuery}
-                            onChange={(e) => setTestQuery(e.target.value)}
-                            placeholder="Enter a test prompt to monitor AI processing..."
-                            disabled={isProcessing}
-                            className="flex-1"
-                        />
-                        <Button type="submit" disabled={isProcessing || !testQuery.trim()}>
-                            {isProcessing ? 'Processing...' : 'Test'}
-                        </Button>
-                    </form>
-                </CardContent>
-            </Card>
+            <CardContent className="p-4">
+                <form onSubmit={handleSubmit} className="flex gap-2">
+                    <Input
+                        value={testQuery}
+                        onChange={(e) => setTestQuery(e.target.value)}
+                        placeholder="Enter a test prompt to monitor AI processing..."
+                        disabled={isProcessing}
+                        className="flex-1"
+                    />
+                    <Button type="submit" disabled={isProcessing || !testQuery.trim()}>
+                        {isProcessing ? 'Processing...' : 'Test'}
+                    </Button>
+                </form>
+            </CardContent>
 
             <Card className="flex-1 min-h-[400px] overflow-hidden flex flex-col">
                 <CardHeader className="pb-2">

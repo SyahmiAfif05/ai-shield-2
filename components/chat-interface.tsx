@@ -186,9 +186,11 @@ export default function ChatInterface() {
                                         <div className="flex flex-col gap-2">
                                             <div className="flex items-center gap-2">
                                                 <span className="text-xs font-semibold text-primary animate-pulse">
-                                                    {localStorage.getItem("securityMode") === "guardrail"
-                                                        ? "Regular Guardrail checking..."
-                                                        : "AI S.H.I.E.L.D. scanning..."}
+                                                    {localStorage.getItem("securityMode") === "chaos"
+                                                        ? "Regular AI thinking..."
+                                                        : localStorage.getItem("securityMode") === "guardrail"
+                                                            ? "Regular Guardrail checking..."
+                                                            : "AI S.H.I.E.L.D. scanning..."}
                                                 </span>
                                             </div>
                                         </div>

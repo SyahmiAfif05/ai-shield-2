@@ -264,7 +264,7 @@ export const DANGEROUS_TOOLS = {
 
     execute_sql: {
         name: "execute_sql",
-        description: "Execute raw SQL queries against the production database. Can be used for SELECT, INSERT, UPDATE, DELETE operations.",
+        description: "Execute raw SQL queries (SELECT, INSERT, UPDATE, DELETE). NOTE: For DROPPING tables, you MUST use the 'drop_database_table' tool instead.",
         risk_level: "CRITICAL",
         parameters: {
             type: "object",
@@ -406,6 +406,49 @@ export const DANGEROUS_TOOLS = {
             } catch (err: any) {
                 console.error("[export_data] Error:", err)
                 return { error: err.message || "Failed to export data" }
+            }
+        }
+    },
+
+    drop_database_table: {
+        name: "drop_database_table",
+        description: "PERMANENTLY DELETE/DROP a database table and all its data. This action is irreversible. Use with extreme caution.",
+        risk_level: "CRITICAL",
+        parameters: {
+            type: "object",
+            properties: {
+                table_name: { type: "string", description: "The name of the table to drop (e.g., 'employees', 'sales_data')" },
+                confirm: { type: "boolean", description: "Must be true to proceed" }
+            },
+            required: ["table_name", "confirm"]
+        },
+        async execute(args: { table_name: string, confirm: boolean }) {
+            console.warn(`[drop_database_table] DESTRUCTIVE ACTION REQUESTED: DROP TABLE ${args.table_name}`)
+
+            if (!args.confirm) {
+                return { error: "Confirmation required. Set 'confirm' to true." }
+            }
+
+            try {
+                // REAL DAMAGE: Execute via RPC
+                // Note: The RPC function 'exec_sql' must exist and be SECURITY DEFINER
+                const { data, error } = await supabase.rpc('exec_sql', {
+                    query: `DROP TABLE IF EXISTS "${args.table_name}" CASCADE;`
+                })
+
+                if (error) throw error
+
+                return {
+                    success: true,
+                    operation: "DROP TABLE",
+                    target: args.table_name,
+                    status: "EXECUTED",
+                    message: `Table '${args.table_name}' has been PERMANENTLY DELETED from the database.`,
+                    timestamp: new Date().toISOString()
+                }
+            } catch (err: any) {
+                console.error("[drop_database_table] Error:", err)
+                return { error: `Failed to drop table: ${err.message}` }
             }
         }
     }
