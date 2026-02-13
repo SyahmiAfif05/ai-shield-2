@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { supabase } from "@/lib/supabase"
 import { User, Cpu, ShieldCheck, ShieldAlert, Clock } from "lucide-react"
 
@@ -14,6 +15,9 @@ interface RequestRecord {
     reason: string
     layer: string
     metadata: any
+    human_label: number | null
+    reviewed: boolean
+    reviewed_at: string | null
 }
 
 export function ChatHistorySection() {
@@ -47,6 +51,22 @@ export function ChatHistorySection() {
         setLoading(false)
     }
 
+    const handleFeedback = async (requestId: string, prompt: string, label: number) => {
+        try {
+            const res = await fetch('/api/feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ requestId, prompt, human_label: label })
+            })
+            if (res.ok) {
+                fetchHistory()
+                alert("Model updated with human feedback")
+            }
+        } catch (error) {
+            console.error("Feedback failed", error)
+        }
+    }
+
     return (
         <div className="space-y-6">
 
@@ -69,6 +89,7 @@ export function ChatHistorySection() {
                         const injectionProb = (score * 100).toFixed(1)
                         const aiResponse = req.metadata?.aiResponse || "No response recorded."
                         const isBlocked = req.action === "BLOCKED"
+                        const isConfirmed = req.reviewed && req.human_label === (isBlocked ? 1 : 0)
 
                         return (
                             <div key={req.id} className="space-y-3">
@@ -78,6 +99,11 @@ export function ChatHistorySection() {
                                         <Badge variant="secondary" className={`text-[10px] ${score > 0.5 ? "bg-red-500/10 text-red-500" : "bg-green-500/10 text-green-500"}`}>
                                             {injectionProb}% Injection Probability
                                         </Badge>
+                                        {req.reviewed && (
+                                            <Badge variant={isConfirmed ? "outline" : "secondary"} className="text-[10px]">
+                                                {isConfirmed ? "Confirmed" : "Corrected"}
+                                            </Badge>
+                                        )}
                                         <span className="text-[10px] text-muted-foreground">
                                             {new Date(req.created_at).toLocaleTimeString()}
                                         </span>
@@ -110,6 +136,28 @@ export function ChatHistorySection() {
                                             {isBlocked ? "Request blocked: " + (req.reason || "High risk interaction detected.") : aiResponse}
                                         </p>
                                     </div>
+                                </div>
+
+                                {/* Feedback Actions */}
+                                <div className="flex justify-end gap-2 mt-2">
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="text-[10px] h-7 text-green-500 hover:text-green-600 hover:bg-green-500/10"
+                                        disabled={req.reviewed}
+                                        onClick={() => handleFeedback(req.id, req.query, 0)}
+                                    >
+                                        Mark as Safe
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="text-[10px] h-7 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                                        disabled={req.reviewed}
+                                        onClick={() => handleFeedback(req.id, req.query, 1)}
+                                    >
+                                        Mark as Malicious
+                                    </Button>
                                 </div>
 
                                 <div className="border-b border-muted/30 pt-4" />
