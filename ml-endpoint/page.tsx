@@ -43,21 +43,36 @@ export default function AdminDashboard() {
     fetchPendingRequests();
   }, []);
 
-  const handleReview = async (id: number, label: number) => {
-    const { error } = await supabase
-      .from('requests')
-      .update({
-        human_label: label,
-        reviewed: true,
-        reviewed_at: new Date().toISOString(),
-      })
-      .eq('id', id);
+  const handleReview = async (id: number, query: string, label: number) => {
+    try {
+      // 1. Send Feedback to ML endpoint for retraining
+      const res = await fetch('http://127.0.0.1:8000/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: query, human_label: label })
+      });
 
-    if (error) {
-      alert('Error updating record: ' + error.message);
-    } else {
-      // Optimistically update UI by removing the reviewed item from the list
-      setRequests((prev) => prev.filter((r) => r.id !== id));
+      if (!res.ok) throw new Error("ML Service responded with an error");
+
+      // 2. Update Supabase
+      const { error } = await supabase
+        .from('requests')
+        .update({
+          human_label: label,
+          reviewed: true,
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+
+      if (error) {
+        alert('Error updating record: ' + error.message);
+      } else {
+        // Optimistically update UI by removing the reviewed item from the list
+        setRequests((prev) => prev.filter((r) => r.id !== id));
+      }
+    } catch (error) {
+      console.error("Feedback failed", error);
+      alert("Could not connect to ML Service. Ensure backend is running on port 8000.");
     }
   };
 
@@ -97,8 +112,8 @@ export default function AdminDashboard() {
                     <td className="px-6 py-4 text-sm text-gray-600">{req.reason}</td>
                     <td className="px-6 py-4 text-sm text-indigo-600 italic">{req.metadata?.generated_intent || 'Unknown'}</td>
                     <td className="px-6 py-4 text-right text-sm font-medium space-x-3 whitespace-nowrap">
-                      <button onClick={() => handleReview(req.id, 1)} className="text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg border border-red-200 transition-all">Confirm Malicious</button>
-                      <button onClick={() => handleReview(req.id, 0)} className="text-green-600 hover:bg-green-50 px-3 py-1.5 rounded-lg border border-green-200 transition-all">Mark as Safe</button>
+                      <button onClick={() => handleReview(req.id, req.query, 1)} className="text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg border border-red-200 transition-all">Confirm Malicious</button>
+                      <button onClick={() => handleReview(req.id, req.query, 0)} className="text-green-600 hover:bg-green-50 px-3 py-1.5 rounded-lg border border-green-200 transition-all">Mark as Safe</button>
                     </td>
                   </tr>
                 ))
